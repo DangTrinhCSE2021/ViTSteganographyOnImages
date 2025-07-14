@@ -54,7 +54,7 @@ def main():
         checkpoint, chpt_file_name = utils.load_last_checkpoint(os.path.join(current_run, 'checkpoints'))
         print(f'Loaded checkpoint from file {chpt_file_name}')
 
-        noiser = Noiser(noise_config)
+        noiser = Noiser(noise_config, device)
         model = Hidden(hidden_config, device, noiser, tb_logger=None)
         utils.model_from_checkpoint(model, checkpoint)
 
@@ -72,8 +72,9 @@ def main():
             step += 1
             image = image.to(device)
             message = torch.Tensor(np.random.choice([0, 1], (image.shape[0], hidden_config.message_length))).to(device)
-            losses, (encoded_images, noised_images, decoded_messages) = model.validate_on_batch([image, message],
-                                                                                                set_eval_mode=True)
+            losses, (encoded_images, noised_images, decoded_messages) = model.validate_on_batch([image, message])
+            # losses, (encoded_images, noised_images, decoded_messages) = model.validate_on_batch([image, message],
+            #                                                                                     set_eval_mode=True)
             if not losses_accu:  # dict is empty, initialize
                 for name in losses:
                     losses_accu[name] = AverageMeter()
