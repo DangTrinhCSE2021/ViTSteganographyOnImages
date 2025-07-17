@@ -5,10 +5,19 @@ import numpy as np
 import utils
 import logging
 from collections import defaultdict
+import math
 
 from options import *
 from model.hidden import Hidden
 from average_meter import AverageMeter
+
+
+def compute_psnr(img1, img2):
+    mse = torch.mean((img1 - img2) ** 2)
+    if mse == 0:
+        return float('inf')
+    PIXEL_MAX = 2.0  # since images are in range [-1, 1]
+    return 20 * math.log10(PIXEL_MAX / math.sqrt(mse.item()))
 
 
 def train(model: Hidden,
@@ -39,6 +48,9 @@ def train(model: Hidden,
     print_each = 10
     images_to_save = 8
     saved_images_size = (512, 512)
+
+    best_val_error = float('inf')
+    best_epoch = -1
 
     for epoch in range(train_options.start_epoch, train_options.number_of_epochs + 1):
         logging.info('\nStarting epoch {}/{}'.format(epoch, train_options.number_of_epochs))
@@ -71,6 +83,7 @@ def train(model: Hidden,
 
         first_iteration = True
         validation_losses = defaultdict(AverageMeter)
+        psnr_values = []
         logging.info('Running validation for epoch {}/{}'.format(epoch, train_options.number_of_epochs))
         for image, _ in val_data:
             image = image.to(device)
@@ -78,6 +91,9 @@ def train(model: Hidden,
             losses, (encoded_images, noised_images, decoded_messages) = model.validate_on_batch([image, message])
             for name, loss in losses.items():
                 validation_losses[name].update(loss)
+            # Compute PSNR for each batch
+            psnr = compute_psnr(image, encoded_images)
+            psnr_values.append(psnr)
             if first_iteration:
                 if hidden_config.enable_fp16:
                     image = image.float()
@@ -88,8 +104,19 @@ def train(model: Hidden,
                                   os.path.join(this_run_folder, 'images'), resize_to=saved_images_size)
                 first_iteration = False
 
+        avg_psnr = sum(psnr_values) / len(psnr_values) if psnr_values else 0
+        logging.info(f'Average PSNR for epoch {epoch}: {avg_psnr:.2f} dB')
         utils.log_progress(validation_losses)
         logging.info('-' * 40)
-        utils.save_checkpoint(model, train_options.experiment_name, epoch, os.path.join(this_run_folder, 'checkpoints'))
         utils.write_losses(os.path.join(this_run_folder, 'validation.csv'), validation_losses, epoch,
                            time.time() - epoch_start)
+
+        # Only save the best model (lowest validation bitwise-error)
+        val_bitwise_error = validation_losses['bitwise-error  '].avg
+        if val_bitwise_error < best_val_error:
+            best_val_error = val_bitwise_error
+            best_epoch = epoch
+            logging.info(f'New best model found at epoch {epoch} with bitwise-error {val_bitwise_error:.4f}. Saving checkpoint.')
+            utils.save_checkpoint(model, train_options.experiment_name, epoch, os.path.join(this_run_folder, 'checkpoints'))
+        else:
+            logging.info(f'No improvement in bitwise-error ({val_bitwise_error:.4f}) at epoch {epoch}. Best so far: {best_val_error:.4f} at epoch {best_epoch}.')

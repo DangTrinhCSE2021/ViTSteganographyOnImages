@@ -23,7 +23,7 @@ def image_to_tensor(image):
     :return: (batch_size x channels x height x width) torch tensor in range [-1.0, 1.0]
     """
     image_tensor = torch.Tensor(image)
-    image_tensor.unsqueeze_(0)
+    image_tensor = image_tensor.unsqueeze(0)
     image_tensor = image_tensor.permute(0, 3, 1, 2)
     image_tensor = image_tensor / 127.5 - 1
     return image_tensor

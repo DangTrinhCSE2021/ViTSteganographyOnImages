@@ -1,4 +1,4 @@
-'''
+import torch
 import torch.nn as nn
 from options import HiDDenConfiguration
 from model.conv_bn_relu import ConvBNRelu
@@ -22,8 +22,7 @@ class Discriminator(nn.Module):
         X = self.before_linear(image)
         # the output is of shape b x c x 1 x 1, and we want to squeeze out the last two dummy dimensions and make
         # the tensor of shape b x c. If we just call squeeze_() it will also squeeze the batch dimension when b=1.
-        X.squeeze_(3).squeeze_(2)
+        X = X.squeeze(3).squeeze(2)
         X = self.linear(X)
-        # X = torch.sigmoid(X)
+        X = torch.sigmoid(X)
         return X
-'''
