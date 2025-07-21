@@ -94,7 +94,7 @@ def main():
                                             encoder_blocks=4, encoder_channels=32,
                                             decoder_blocks=7, decoder_channels=64,
                                             use_discriminator=True,
-                                            use_vgg=False,
+                                            use_vgg=True,
                                             discriminator_blocks=3, discriminator_channels=64,
                                             decoder_loss=1,
                                             encoder_loss=0.7,

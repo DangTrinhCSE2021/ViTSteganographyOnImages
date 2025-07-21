@@ -169,6 +169,7 @@ def create_folder_for_run(runs_folder, experiment_name):
     os.makedirs(this_run_folder)
     os.makedirs(os.path.join(this_run_folder, 'checkpoints'))
     os.makedirs(os.path.join(this_run_folder, 'images'))
+    os.makedirs(os.path.join(this_run_folder, 'recovered_images'))
 
     return this_run_folder
 

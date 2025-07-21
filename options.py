@@ -33,6 +33,7 @@ class HiDDenConfiguration:
                  decoder_loss: float,
                  encoder_loss: float,
                  adversarial_loss: float,
+                 image_recovery_loss: float = 1.0,
                  enable_fp16: bool = False,
                  encoder_mode: str = "vit"):  # ✅ Add encoder_mode here
         self.H = H
@@ -49,5 +50,6 @@ class HiDDenConfiguration:
         self.decoder_loss = decoder_loss
         self.encoder_loss = encoder_loss
         self.adversarial_loss = adversarial_loss
+        self.image_recovery_loss = image_recovery_loss
         self.enable_fp16 = enable_fp16
         self.encoder_mode = encoder_mode  # ✅ Now it's included in HiDDenConfiguration

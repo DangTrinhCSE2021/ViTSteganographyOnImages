@@ -10,8 +10,8 @@ class EncoderDecoder(nn.Module):
     Combines Encoder->Noiser->Decoder into single pipeline.
     The input is the cover image and the watermark message. The module inserts the watermark into the image
     (obtaining encoded_image), then applies Noise layers (obtaining noised_image), then passes the noised_image
-    to the Decoder which tries to recover the watermark (called decoded_message). The module outputs
-    a three-tuple: (encoded_image, noised_image, decoded_message)
+    to the Decoder which tries to recover the watermark (called decoded_message) and the original image (recovered_image).
+    The module outputs a four-tuple: (encoded_image, noised_image, decoded_message, recovered_image)
     """
     def __init__(self, config: HiDDenConfiguration, noiser: Noiser):
 
@@ -24,5 +24,5 @@ class EncoderDecoder(nn.Module):
         encoded_image = self.encoder(image, message)
         noised_and_cover = self.noiser([encoded_image, image])
         noised_image = noised_and_cover[0]
-        decoded_message = self.decoder(noised_image)
-        return encoded_image, noised_image, decoded_message
+        decoded_message, recovered_image = self.decoder(noised_image)
+        return encoded_image, noised_image, decoded_message, recovered_image

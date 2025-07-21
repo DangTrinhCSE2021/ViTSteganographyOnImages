@@ -37,7 +37,7 @@ class Hidden:
             from tensorboard_logger import TensorBoardLogger
             encoder_final = self.encoder_decoder.encoder._modules['final_layer']
             encoder_final.weight.register_hook(tb_logger.grad_hook_by_name('grads/encoder_out'))
-            decoder_final = self.encoder_decoder.decoder._modules['linear']
+            decoder_final = self.encoder_decoder.decoder.message_linear
             decoder_final.weight.register_hook(tb_logger.grad_hook_by_name('grads/decoder_out'))
 
     def train_on_batch(self, batch: list):
@@ -49,7 +49,7 @@ class Hidden:
         # === 1. Forward pass through encoder-decoder ===
         self.encoder_decoder.train()
         with torch.enable_grad():
-            encoded_images, noised_images, decoded_messages = self.encoder_decoder(images, messages)
+            encoded_images, noised_images, decoded_messages, recovered_images = self.encoder_decoder(images, messages)
 
             # === 2. Train Discriminator ===
             self.discriminator.train()
@@ -64,20 +64,34 @@ class Hidden:
 
             # === 3. Train Encoder-Decoder (Generator) ===
             self.optimizer_enc_dec.zero_grad()
-            if self.vgg_loss is None:
-                g_loss_enc = self.mse_loss(encoded_images, images)
-            else:
+            # Perceptual (VGG) loss
+            if self.vgg_loss is not None:
                 vgg_on_cov = self.vgg_loss(images)
                 vgg_on_enc = self.vgg_loss(encoded_images)
-                g_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc)
+                vgg_on_rec = self.vgg_loss(recovered_images)
+                perceptual_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc)
+                perceptual_loss_rec = self.mse_loss(vgg_on_cov, vgg_on_rec)
+            else:
+                perceptual_loss_enc = 0.0
+                perceptual_loss_rec = 0.0
+            # L2 regularization between original and encoded images
+            l2_reg = torch.mean((encoded_images - images) ** 2)
+            # Standard losses
+            g_loss_enc = self.mse_loss(encoded_images, images)
             g_loss_dec = self.mse_loss(decoded_messages, messages)
+            g_loss_img = self.mse_loss(recovered_images, images)
             # Adversarial loss: generator wants discriminator to think encoded images are real
             fake_outputs_for_g = self.discriminator(encoded_images)
             g_adv_loss = self.bce_loss(fake_outputs_for_g, real_labels)
+            # Total generator loss
             g_loss = (
                 self.config.encoder_loss * g_loss_enc +
                 self.config.decoder_loss * g_loss_dec +
-                self.config.adversarial_loss * g_adv_loss
+                5.0 * g_loss_img +  # image loss weight increased to 5.0
+                self.config.adversarial_loss * g_adv_loss +
+                0.1 * perceptual_loss_enc +  # weight for perceptual loss (tunable)
+                0.1 * perceptual_loss_rec +  # weight for perceptual loss on recovered image (tunable)
+                0.01 * l2_reg  # weight for L2 regularization (tunable)
             )
             g_loss.backward()
             self.optimizer_enc_dec.step()
@@ -90,32 +104,52 @@ class Hidden:
             'loss           ': g_loss.item(),
             'encoder_mse    ': g_loss_enc.item(),
             'dec_mse        ': g_loss_dec.item(),
+            'img_recovery   ': g_loss_img.item(),
             'bitwise-error  ': bitwise_avg_err,
             'd_loss         ': d_loss.item(),
             'g_adv_loss     ': g_adv_loss.item(),
+            'perceptual_enc ': perceptual_loss_enc.item() if self.vgg_loss is not None else 0.0,
+            'perceptual_rec ': perceptual_loss_rec.item() if self.vgg_loss is not None else 0.0,
+            'l2_reg         ': l2_reg.item(),
         }
-        return losses, (encoded_images, noised_images, decoded_messages)
+        return losses, (encoded_images, noised_images, decoded_messages, recovered_images)
 
     def validate_on_batch(self, batch: list):
         if self.tb_logger is not None:
             encoder_final = self.encoder_decoder.encoder._modules['final_layer']
             self.tb_logger.add_tensor('weights/encoder_out', encoder_final.weight)
-            decoder_final = self.encoder_decoder.decoder._modules['linear']
+            decoder_final = self.encoder_decoder.decoder.message_linear
             self.tb_logger.add_tensor('weights/decoder_out', decoder_final.weight)
 
         images, messages = batch
         batch_size = images.shape[0]
         self.encoder_decoder.eval()
         with torch.no_grad():
-            encoded_images, noised_images, decoded_messages = self.encoder_decoder(images, messages)
-            if self.vgg_loss is None:
-                g_loss_enc = self.mse_loss(encoded_images, images)
-            else:
+            encoded_images, noised_images, decoded_messages, recovered_images = self.encoder_decoder(images, messages)
+            # Perceptual (VGG) loss
+            if self.vgg_loss is not None:
                 vgg_on_cov = self.vgg_loss(images)
                 vgg_on_enc = self.vgg_loss(encoded_images)
-                g_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc)
+                vgg_on_rec = self.vgg_loss(recovered_images)
+                perceptual_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc)
+                perceptual_loss_rec = self.mse_loss(vgg_on_cov, vgg_on_rec)
+            else:
+                perceptual_loss_enc = 0.0
+                perceptual_loss_rec = 0.0
+            # L2 regularization between original and encoded images
+            l2_reg = torch.mean((encoded_images - images) ** 2)
+            # Standard losses
+            g_loss_enc = self.mse_loss(encoded_images, images)
             g_loss_dec = self.mse_loss(decoded_messages, messages)
-            g_loss = self.config.encoder_loss * g_loss_enc + self.config.decoder_loss * g_loss_dec
+            g_loss_img = self.mse_loss(recovered_images, images)
+            g_loss = (
+                self.config.encoder_loss * g_loss_enc +
+                self.config.decoder_loss * g_loss_dec +
+                5.0 * g_loss_img +  # image loss weight increased to 5.0
+                0.1 * perceptual_loss_enc +
+                0.1 * perceptual_loss_rec +
+                0.01 * l2_reg
+            )
 
         decoded_rounded = decoded_messages.detach().cpu().numpy().round().clip(0, 1)
         bitwise_avg_err = np.sum(np.abs(decoded_rounded - messages.detach().cpu().numpy())) / (
@@ -125,9 +159,13 @@ class Hidden:
             'loss           ': g_loss.item(),
             'encoder_mse    ': g_loss_enc.item(),
             'dec_mse        ': g_loss_dec.item(),
+            'img_recovery   ': g_loss_img.item(),
             'bitwise-error  ': bitwise_avg_err,
+            'perceptual_enc ': perceptual_loss_enc.item() if self.vgg_loss is not None else 0.0,
+            'perceptual_rec ': perceptual_loss_rec.item() if self.vgg_loss is not None else 0.0,
+            'l2_reg         ': l2_reg.item(),
         }
-        return losses, (encoded_images, noised_images, decoded_messages)
+        return losses, (encoded_images, noised_images, decoded_messages, recovered_images)
 
     def to_string(self):
         return '{}'.format(str(self.encoder_decoder))
