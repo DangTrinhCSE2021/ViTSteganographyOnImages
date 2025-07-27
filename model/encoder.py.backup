@@ -10,13 +10,14 @@ class Encoder(nn.Module):
     """
     Inserts a watermark into an image.
     """
-    def __init__(self, config: HiDDenConfiguration):
+    def __init__(self, config: HiDDenConfiguration, device: torch.device = None):
         super(Encoder, self).__init__()
         self.H = config.H
         self.W = config.W
         self.conv_channels = config.encoder_channels
         self.num_blocks = config.encoder_blocks
         self.encoder_loss = config.encoder_loss
+        self.device = device if device is not None else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Add encoder_mode attribute safely
         self.encoder_mode = getattr(config, "encoder_mode", None)  # Default to None if missing
@@ -70,8 +71,9 @@ class Encoder(nn.Module):
         return im_w
 
     def forward_dino_output(self, image, message):
-        image_list = [x.squeeze(0) for x in torch.split(image.cpu(), 1)]
-        inputs = self.feature_extractor(image_list, return_tensors="pt").to('cuda')
+        # Keep tensors on the same device - no unnecessary CPU transfers
+        image_list = [x.squeeze(0) for x in torch.split(image, 1)]
+        inputs = self.feature_extractor(image_list, return_tensors="pt").to(self.device)
         outputs = self.model(**inputs)
         semantic_representation = outputs.pooler_output
         semantic_representation = self.linear(semantic_representation)
@@ -84,8 +86,9 @@ class Encoder(nn.Module):
         return im_w
 
     def forward_dino_attention(self, image, message):
-        image_list = [x.squeeze(0) for x in torch.split(image.cpu(), 1)]
-        inputs = self.feature_extractor(image_list, return_tensors="pt").to('cuda')
+        # Keep tensors on the same device - no unnecessary CPU transfers
+        image_list = [x.squeeze(0) for x in torch.split(image, 1)]
+        inputs = self.feature_extractor(image_list, return_tensors="pt").to(self.device)
         outputs = self.model(**inputs)
         attention = outputs.attentions[-1][:, :, 0, 1:]
         attention = attention.reshape(attention.shape[0], attention.shape[1], 28, 28)

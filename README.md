@@ -22,9 +22,17 @@ This project implements a robust, deep learning-based image watermarking scheme 
    git clone <repo-url>
    cd VitTransformerWatermarkingScheme
    ```
-2. Install dependencies:
+2. Check your environment and install dependencies:
+   ```bash
+   python setup_check.py
+   ```
+   Or install manually:
    ```bash
    pip install -r requirements.txt
+   ```
+3. Verify installation:
+   ```bash
+   python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
    ```
 
 ## Data Preparation
@@ -44,13 +52,31 @@ data/
 ## Training a Model
 Run the following command to start training:
 ```bash
-python main.py new --data-dir data --batch-size 32 --epochs 5 --name my_experiment
+python main.py new --data-dir data --batch-size 32 --epochs 5 --name my_experiment --encoder-mode vit
 ```
 - `--data-dir`: Path to your data folder (should contain `train` and `val` subfolders)
 - `--batch-size`: Training batch size
 - `--epochs`: Number of epochs
 - `--name`: Name for this experiment
+- `--encoder-mode`: Encoder architecture ('vit', 'dino-output', or 'dino-attention')
 - Optional: `--noise` to specify noise layers, `--tensorboard` to enable logging
+
+### Encoder Modes
+- **vit**: Standard Vision Transformer encoder
+- **dino-output**: Uses DINO model output features
+- **dino-attention**: Uses DINO attention maps
+
+### Example Commands
+```bash
+# Train with ViT encoder
+python main.py new --data-dir data --batch-size 16 --epochs 100 --name vit_experiment --encoder-mode vit
+
+# Train with DINO output features
+python main.py new --data-dir data --batch-size 16 --epochs 100 --name dino_experiment --encoder-mode dino-output
+
+# Train with noise layers
+python main.py new --data-dir data --batch-size 16 --epochs 100 --name robust_experiment --encoder-mode vit --noise "cropout((0.55, 0.6), (0.55, 0.6))" "jpeg_compression()"
+```
 
 ## Validating a Model
 To validate your trained model on the validation set:

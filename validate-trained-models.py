@@ -24,8 +24,8 @@ def write_validation_loss(file_name, losses_accu, experiment_name, epoch, write_
 
 
 def main():
-    # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    device = torch.device('cpu')
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    print(f"Using device: {device}")
 
     parser = argparse.ArgumentParser(description='Training of HiDDeN nets')
     # parser.add_argument('--size', '-s', default=128, type=int, help='The size of the images (images are square so this is height and width).')

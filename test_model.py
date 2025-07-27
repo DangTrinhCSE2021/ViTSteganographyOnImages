@@ -26,6 +26,10 @@ def main():
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
+    
+    print(f"Using device: {device}")
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
 
     parser = argparse.ArgumentParser(description='Test trained models')
     parser.add_argument('--options-file', '-o', default='options-and-config.pickle', type=str,
