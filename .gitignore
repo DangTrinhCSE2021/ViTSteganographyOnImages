@@ -44,3 +44,6 @@ experiments/
 thesis/
 thesis_visualization/
 create_thesis_visualization.py
+data/
+latent_runs/
+experiments
