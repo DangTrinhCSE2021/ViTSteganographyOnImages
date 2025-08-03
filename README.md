@@ -52,31 +52,23 @@ data/
 ## Training a Model
 Run the following command to start training:
 ```bash
-python main.py new --data-dir data --batch-size 32 --epochs 5 --name my_experiment --encoder-mode vit
+python train_high_recovery_latent.py --data-dir data --batch-size 32 --epochs 5 --name my_experiment 
 ```
 - `--data-dir`: Path to your data folder (should contain `train` and `val` subfolders)
 - `--batch-size`: Training batch size
 - `--epochs`: Number of epochs
 - `--name`: Name for this experiment
-- `--encoder-mode`: Encoder architecture ('vit', 'dino-output', or 'dino-attention')
+
 - Optional: `--noise` to specify noise layers, `--tensorboard` to enable logging
 
-### Encoder Modes
-- **vit**: Standard Vision Transformer encoder
-- **dino-output**: Uses DINO model output features
-- **dino-attention**: Uses DINO attention maps
 
 ### Example Commands
 ```bash
 # Train with ViT encoder
-python main.py new --data-dir data --batch-size 16 --epochs 100 --name vit_experiment --encoder-mode vit
+python train_high_recovery_latent.py --epochs 15 --batch_size 32 --lr 3e-4 --clean_train_epochs 5
 
 # Train with DINO output features
-python main.py new --data-dir data --batch-size 16 --epochs 100 --name dino_experiment --encoder-mode dino-output
 
-# Train with noise layers
-python main.py new --data-dir data --batch-size 16 --epochs 100 --name robust_experiment --encoder-mode vit --noise "cropout((0.55, 0.6), (0.55, 0.6))" "jpeg_compression()"
-```
 
 ## Validating a Model
 To validate your trained model on the validation set:
@@ -87,13 +79,7 @@ python validate-trained-models.py --data-dir data --runs_root runs/
 ## Testing on a Single Image
 To embed and extract a message from a single image:
 ```bash
-python test_model.py \
-  --options-file "runs/my_experiment YYYY.MM.DD--HH-MM-SS/options-and-config.pickle" \
-  --checkpoint-file "runs/my_experiment YYYY.MM.DD--HH-MM-SS/checkpoints/my_experiment--epoch-5.pyt" \
-  --source-image path/to/your/image.jpg
-```
-- The result image (`epoch-test.png`) will be saved in your current directory.
-- The script prints the original and decoded messages and the bitwise error.
+python test_corrected_recovery_model.py --model_path "..." --test_image "" --num_tests 5 --save_results
 
 ## Embedding and Extracting Messages
 - **Embedding:** The encoder embeds a random binary message into a cropped region of the input image.
